@@ -1,0 +1,10 @@
+
+lib64/
+
+*.pyc
+
+data/
+
+model_jm/
+
+Agent/.idea/
