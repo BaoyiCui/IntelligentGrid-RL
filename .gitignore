@@ -8,3 +8,7 @@ data/
 model_jm/
 
 Agent/.idea/
+
+*.xml
+
+*.iml
