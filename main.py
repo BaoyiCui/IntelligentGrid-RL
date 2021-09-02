@@ -7,6 +7,7 @@ import numpy as np
 from submission.agent import Agent
 from Environment.base_env import Environment
 from utilize.settings import settings
+import paddle
 
 
 def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
@@ -51,15 +52,18 @@ def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
 if __name__ == "__main__":
     SEED = 0
     max_timestep = 10  # 最大时间步数
-    max_episode = 1  # 回合数
+    max_episode = 2  # 回合数
     submission_path = './submission'
+    model_path = './submission/saved_model/model-1'
     # my_agent = RandomAgent(settings.num_gen)
     agent = Agent(copy.deepcopy(settings), submission_path)
-    env = Environment(settings)
+    env = Environment(settings, 'EPRIReward')
     episode_max_steps = 288
     scores = []
-
     for start_idx in np.random.randint(settings.num_sample, size=20):
         score = run_one_episode(env, SEED, start_idx, episode_max_steps, agent)
-    print('score:', score)
+        scores.append(score)
+        print('score:', score)
+    paddle.save(agent.model.state_dict(), model_path)
+    print('scores:', score)
     # run_task(my_agent)

@@ -1,9 +1,27 @@
 import os
 import paddle
 import numpy as np
-from submission.grid_model import GridModel
-from submission.grid_agent import GridAgent
+# from submission.grid_model import GridModel
+# from submission.grid_agent import GridAgent
 
+from submission.parl_agent import *
+from submission.parl_model import *
+from submission.parl_algorithm import *
+
+
+import copy
+from abc import abstractmethod
+
+class BaseAgent():
+    def __init__(self, num_gen):
+        self.num_gen = num_gen
+
+    def reset(self, ons):
+        pass
+
+    @abstractmethod
+    def act(self, obs, reward, done=False):
+        pass
 
 def wrap_action(adjust_gen_p):
     act = {
@@ -16,25 +34,29 @@ OBS_DIM = 620
 ACT_DIM = 54
 
 
-class Agent(object):
+class Agent(BaseAgent):
 
     def __init__(self, settings, this_directory_path):
         self.settings = settings
         
-        model_path = os.path.join(this_directory_path, "saved_model/model-0")
-
-        model = GridModel(OBS_DIM, ACT_DIM)
-
+        model_path = os.path.join(this_directory_path, "saved_model/model-1")
+        # model = GridModel(OBS_DIM, ACT_DIM)
+        self.model = ParlModel(OBS_DIM, ACT_DIM)
+        self.alg = parl.algorithms.PolicyGradient(model, lr=1e-3)
+        self.agent = ParlAgent(self.alg)        
+        
         # paddle.save(model.state_dict(), model_path)
-        param_dict = paddle.load(model_path)
-        model.set_state_dict(param_dict)
-
-        self.agent = GridAgent(model)
+        # param_dict = paddle.load(model_path)
+        # model.set_state_dict(param_dict)
+        # self.model = model
+        # self.agent = GridAgent(model)
         
     def act(self, obs, reward, done=False):
         features = self._process_obs(obs)
-        action = self.agent.predict(features)
-        ret_action = self._process_action(obs, action)
+        # action = self.agent.predict(features)
+        # ret_action = self._process_action(obs, action)
+        features = features.reshape(1, -1)
+        ret_action = self.agent.sample(features)
         return ret_action
     
     def _process_obs(self, obs):

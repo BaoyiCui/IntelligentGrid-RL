@@ -1,7 +1,9 @@
 import yaml
 
+
 def check_gen_type(gen_type):
     return all([ele == 1 or ele == 5 or ele == 2 for ele in gen_type])
+
 
 # get dict attribute with 'obj.attr' format
 class dotdict(dict):
@@ -10,6 +12,7 @@ class dotdict(dict):
             return self[name]
         except KeyError:
             raise AttributeError(name)
+
 
 with open('utilize/parameters/main.yml', 'r') as f:
     dict_ = yaml.load(f, Loader=yaml.Loader)
