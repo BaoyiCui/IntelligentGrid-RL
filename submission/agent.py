@@ -3,6 +3,7 @@ import paddle
 import numpy as np
 # from submission.grid_model import GridModel
 # from submission.grid_agent import GridAgent
+import parl.algorithms
 
 from submission.parl_agent import *
 from submission.parl_model import *
@@ -11,6 +12,17 @@ from submission.parl_algorithm import *
 
 import copy
 from abc import abstractmethod
+
+
+WARMUP_STEPS = 1e4
+EVAL_EPISODES = 5
+MEMORY_SIZE = int(1e6)
+BATCH_SIZE = 100
+GAMMA = 0.99
+TAU = 0.005
+ACTOR_LR = 1e-3
+CRITIC_LR = 1e-3
+EXPL_NOISE = 0.1  # Std of Gaussian exploration noise
 
 class BaseAgent():
     def __init__(self, num_gen):
@@ -42,7 +54,7 @@ class Agent(BaseAgent):
         model_path = os.path.join(this_directory_path, "saved_model/model-1")
         # model = GridModel(OBS_DIM, ACT_DIM)
         self.model = ParlModel(OBS_DIM, ACT_DIM)
-        self.alg = parl.algorithms.PolicyGradient(model, lr=1e-3)
+        self.alg = parl.algorithms.DDPG(self.model, gamma=GAMMA, tau=TAU, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR)
         self.agent = ParlAgent(self.alg)        
         
         # paddle.save(model.state_dict(), model_path)
@@ -55,8 +67,11 @@ class Agent(BaseAgent):
         features = self._process_obs(obs)
         # action = self.agent.predict(features)
         # ret_action = self._process_action(obs, action)
-        features = features.reshape(1, -1)
-        ret_action = self.agent.sample(features)
+        features = features.reshape(-1)
+        ret_action = self.agent.sample(features, obs)
+        ret_action = self._process_action(obs, ret_action)
+        # print(type(ret_action))
+        # ret_action = ret_action[0]
         return ret_action
     
     def _process_obs(self, obs):
@@ -82,7 +97,6 @@ class Agent(BaseAgent):
     
     def _process_action(self, obs, action):
         N = len(action)
-
         gen_p_action_space = obs.action_space['adjust_gen_p']
 
         low_bound = gen_p_action_space.low
