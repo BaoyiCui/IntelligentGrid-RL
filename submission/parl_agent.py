@@ -19,43 +19,54 @@ def wrap_action(adjust_gen_p):
 
 class ParlAgent(parl.Agent):
     
-    def __init__(self, algorithm):
+    def __init__(self, algorithm, act_dim, expl_noise=0.1):
 
         super(ParlAgent, self).__init__(algorithm)
+        self.act_dim = act_dim
+        self.expl_noise = expl_noise
+        self.alg.sync_target(decay=0)
 
     def sample(self, obs_features, obs):
-        obs_features = paddle.to_tensor(obs_features, dtype='float32')
-        #print(obs)
-        prob = self.alg.predict(obs_features)
-        prob = prob.numpy()
-        #print(type(prob))
-        #prob = prob.reshape(-1)
-        #print(prob)
-        #act = np.random.choice(len(prob), 1, p=prob)[0]
-        act = prob
+        # obs_features = paddle.to_tensor(obs_features, dtype='float32')
+        prob = self.predict(obs_features)
+        # prob = prob.numpy()
+        action_noise = np.random.normal(0, self.expl_noise, size=self.act_dim)
+        act = (prob + action_noise).clip(-1, 1)
         #act = self._process_action(obs, act)
         return act
 
     def predict(self, obs):
 
-        obs = paddle.to_tensor(obs, dtype='float32')
-        prob = self.alg.predict(obs)
-        act = self._process_action()
-        re_act = prob.argmax().numpy()[0]
+        obs = paddle.to_tensor(obs.reshape(1, -1), dtype='float32')
+        action_numpy = self.alg.predict(obs)
+        # prob = self.alg.predict(obs)
+        # act = self._process_action()
+        re_act = action_numpy.argmax().numpy()[0]
 
         return re_act
 
-    def learn(self, obs, act, reward):
+    def learn(self, obs, action, reward, next_obs, terminal):
+        terminal = np.expand_dims(terminal, -1)
+        reward = np.expand_dims(reward, -1)
 
-        act = np.expand_dims(act, axis=-1)
-        reward = np.expand_dims(reward, axis=-1)
         obs = paddle.to_tensor(obs, dtype='float32')
-        act = paddle.to_tensor(act, dtype='int32')
+        action = paddle.to_tensor(action, dtype='float32')
         reward = paddle.to_tensor(reward, dtype='float32')
+        next_obs = paddle.to_tensor(next_obs, dtype='float32')
+        terminal = paddle.to_tensor(terminal, dtype='float32')
+        critic_loss, actor_loss = self.alg.learn(obs, action, reward, next_obs,
+                                                 terminal)
+        print('c_loss:', critic_loss, 'a_loss:', actor_loss)
+        return critic_loss, actor_loss
+        # act = np.expand_dims(act, axis=-1)
+        # reward = np.expand_dims(reward, axis=-1)
+        # obs = paddle.to_tensor(obs, dtype='float32')
+        # act = paddle.to_tensor(act, dtype='int32')
+        # reward = paddle.to_tensor(reward, dtype='float32')
+        #
+        # loss = self.alg.learn(obs, act, reward)
 
-        loss = self.alg.learn(obs, act, reward)
-
-        return loss.numpy()[0]
+        # return loss.numpy()[0]
 
     def _process_action(self, obs, action):
         N = len(action)

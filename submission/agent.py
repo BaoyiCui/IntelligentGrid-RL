@@ -55,7 +55,7 @@ class Agent(BaseAgent):
         # model = GridModel(OBS_DIM, ACT_DIM)
         self.model = ParlModel(OBS_DIM, ACT_DIM)
         self.alg = parl.algorithms.DDPG(self.model, gamma=GAMMA, tau=TAU, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR)
-        self.agent = ParlAgent(self.alg)        
+        self.agent = ParlAgent(self.alg, ACT_DIM, EXPL_NOISE)
         
         # paddle.save(model.state_dict(), model_path)
         # param_dict = paddle.load(model_path)

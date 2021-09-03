@@ -11,9 +11,9 @@ import paddle
 from parl.utils import ReplayMemory
 
 
-WARMUP_STEPS = 1e4
+WARMUP_STEPS = 100
 MEMORY_SIZE = int(1e6)
-BATCH_SIZE = 100
+BATCH_SIZE = 20
 ACT_DIM = 54
 OBS_DIM = 620
 
@@ -53,8 +53,9 @@ def run_train_episode(agent, env, rpm):
 
 
 def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
-    print('start_index:', start_idx)
-    obs = env.reset(seed=seed, start_sample_idx=start_idx)
+    # print('start_index:', start_idx)
+    # obs = env.reset(seed=seed, start_sample_idx=start_idx)
+    obs = env.reset()
     reward = 0.0
     done = False
     sum_reward = 0.0
@@ -80,18 +81,27 @@ if __name__ == "__main__":
     agent = Agent(copy.deepcopy(settings), submission_path)
     env = Environment(settings, 'EPRIReward')
     rpm = rpm = ReplayMemory(max_size=MEMORY_SIZE, obs_dim=OBS_DIM, act_dim=ACT_DIM)
+    max_score = 0.0
     print('-------train-------')
     for i in range(1000):
         episode_reward, episode_steps = run_train_episode(agent, env, rpm)
-        print('episode_reward:', episode_reward)
-        print('episode_steps:', episode_steps)
-    print('-------test-------')
-    episode_max_steps = 288
-    scores = []
-    for start_idx in np.random.randint(settings.num_sample, size=20):
-        score = run_one_episode(env, SEED, start_idx, episode_max_steps, agent)
-        scores.append(score)
-        print('score:', score)
-    paddle.save(agent.model.state_dict(), model_path)
-    print('scores:', score)
+        print('episode:', i,'episode_steps:', episode_steps, '    episode_reward:',  episode_reward)
+        # print('episode_steps:', episode_steps)
+        if i % 100 ==0 :
+            episode_max_steps = 288
+            scores = []
+            score = run_one_episode(env, SEED, 0, episode_max_steps, agent)
+            scores.append(score)
+            print('score:', score)
+            if score >= max(scores) :
+                paddle.save(agent.model.state_dict(), model_path)
+    # print('-------test-------')
+    # # episode_max_steps = 288
+    # # scores = []
+    # # for start_idx in np.random.randint(settings.num_sample, size=20):
+    # #     score = run_one_episode(env, SEED, start_idx, episode_max_steps, agent)
+    # #     scores.append(score)
+    # #     print('score:', score)
+    # paddle.save(agent.model.state_dict(), model_path)
+    # print('scores:', score)
     # run_task(my_agent)
