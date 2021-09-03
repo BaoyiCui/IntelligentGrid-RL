@@ -8,6 +8,48 @@ from submission.agent import Agent
 from Environment.base_env import Environment
 from utilize.settings import settings
 import paddle
+from parl.utils import ReplayMemory
+
+
+WARMUP_STEPS = 1e4
+MEMORY_SIZE = int(1e6)
+BATCH_SIZE = 100
+ACT_DIM = 54
+OBS_DIM = 620
+
+
+def run_train_episode(agent, env, rpm):
+    action_dim = ACT_DIM
+    obs = env.reset()
+    done = False
+    episode_reward, episode_steps = 0, 0
+    reward = 0.0
+    episode_max_steps = 288
+    
+    while not done:
+        episode_steps += 1
+        if rpm.size() < WARMUP_STEPS:
+            action_temp = np.random.uniform(-1, 1, size=action_dim)
+        else:
+            action_temp = agent.act(obs, reward, done)
+        action = agent._process_action(obs, action_temp)    
+          
+        next_obs, reward, done, _ = env.step(action)
+        terminal = float(done) if episode_steps < episode_max_steps else 0
+        obs_temp = agent._process_obs(obs)
+        next_obs_temp = agent._process_obs(next_obs)
+        action_array = []
+        
+        rpm.append(obs_temp, action_temp, reward, next_obs_temp, terminal)
+        obs = next_obs
+        episode_reward += reward
+        
+        if rpm.size() >= WARMUP_STEPS:
+            batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal = rpm.sample_batch(BATCH_SIZE)
+            agent.agent.learn(batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal)
+            
+    return episode_reward, episode_steps
+    
 
 
 def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
@@ -19,34 +61,13 @@ def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
     sum_steps = 0.0
     for step in range(episode_max_steps):
         action = agent.act(obs, reward, done)
+        action = agent._process_action(obs, action)
         obs, reward, done, info = env.step(action)
         sum_reward += reward
         sum_steps += 1
         if done:
             break
     return sum_reward, sum_steps
-
-
-# def run_task(my_agent):
-#     for episode in range(max_episode):
-#         print('------ episode ', episode)
-#         env = Environment(settings, "EPRIReward")
-#         print('------ reset ')
-#         obs = env.reset()
-#         reward = 0.0
-#         done = False
-#         # while not done:
-#         for timestep in range(max_timestep):
-#             ids = [i for i, x in enumerate(obs.rho) if x > 1.0]
-#             # print("overflow rho: ", [obs.rho[i] for i in ids])
-#             print('------ step ', timestep)
-#             action = my_agent.act(obs, reward, done)
-#             # print("adjust_gen_p: ", action['adjust_gen_p'])
-#             # print("adjust_gen_v: ", action['adjust_gen_v'])
-#             obs, reward, done, info = env.step(action)
-#             print('info:', info)
-#             if done:
-#                 break
 
 
 if __name__ == "__main__":
@@ -58,6 +79,13 @@ if __name__ == "__main__":
     # my_agent = RandomAgent(settings.num_gen)
     agent = Agent(copy.deepcopy(settings), submission_path)
     env = Environment(settings, 'EPRIReward')
+    rpm = rpm = ReplayMemory(max_size=MEMORY_SIZE, obs_dim=OBS_DIM, act_dim=ACT_DIM)
+    print('-------train-------')
+    for i in range(1000):
+        episode_reward, episode_steps = run_train_episode(agent, env, rpm)
+        print('episode_reward:', episode_reward)
+        print('episode_steps:', episode_steps)
+    print('-------test-------')
     episode_max_steps = 288
     scores = []
     for start_idx in np.random.randint(settings.num_sample, size=20):

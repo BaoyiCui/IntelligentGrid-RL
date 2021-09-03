@@ -69,7 +69,7 @@ class Agent(BaseAgent):
         # ret_action = self._process_action(obs, action)
         features = features.reshape(-1)
         ret_action = self.agent.sample(features, obs)
-        ret_action = self._process_action(obs, ret_action)
+        # ret_action = self._process_action(obs, ret_action)
         # print(type(ret_action))
         # ret_action = ret_action[0]
         return ret_action
