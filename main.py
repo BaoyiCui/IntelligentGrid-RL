@@ -9,11 +9,13 @@ from Environment.base_env import Environment
 from utilize.settings import settings
 import paddle
 from parl.utils import ReplayMemory
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 
-
-WARMUP_STEPS = 100
 MEMORY_SIZE = int(1e6)
-BATCH_SIZE = 20
+WARMUP_STEPS = 5000
+BATCH_SIZE = 256
 ACT_DIM = 54
 OBS_DIM = 620
 
@@ -22,7 +24,7 @@ def run_train_episode(agent, env, rpm):
     action_dim = ACT_DIM
     obs = env.reset()
     done = False
-    episode_reward, episode_steps = 0, 0
+    episode_reward, episode_steps = 0.0, 0
     reward = 0.0
     episode_max_steps = 288
     
@@ -35,6 +37,7 @@ def run_train_episode(agent, env, rpm):
         action = agent._process_action(obs, action_temp)    
           
         next_obs, reward, done, _ = env.step(action)
+
         terminal = float(done) if episode_steps < episode_max_steps else 0
         obs_temp = agent._process_obs(obs)
         next_obs_temp = agent._process_obs(next_obs)
@@ -43,12 +46,16 @@ def run_train_episode(agent, env, rpm):
         rpm.append(obs_temp, action_temp, reward, next_obs_temp, terminal)
         obs = next_obs
         episode_reward += reward
-        
+        critic_loss, actor_loss = 0.0, 0.0
         if rpm.size() >= WARMUP_STEPS:
             batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal = rpm.sample_batch(BATCH_SIZE)
-            agent.agent.learn(batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal)
+
+            critic_loss, actor_loss = agent.agent.learn(batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal)
+        else:
+            print("rpm_size:", rpm.size())
+
             
-    return episode_reward, episode_steps
+    return episode_reward, episode_steps, critic_loss, actor_loss
     
 
 
@@ -80,20 +87,51 @@ if __name__ == "__main__":
     # my_agent = RandomAgent(settings.num_gen)
     agent = Agent(copy.deepcopy(settings), submission_path)
     env = Environment(settings, 'EPRIReward')
-    rpm = rpm = ReplayMemory(max_size=MEMORY_SIZE, obs_dim=OBS_DIM, act_dim=ACT_DIM)
+    rpm = ReplayMemory(max_size=MEMORY_SIZE, obs_dim=OBS_DIM, act_dim=ACT_DIM)
     max_score = 0.0
+    max_reward = 0.0
+
+    num = []
+    rewards = []
+    critic_loss_s = []
+    actor_loss_s = []
+
+
     print('-------train-------')
-    for i in range(1000):
-        episode_reward, episode_steps = run_train_episode(agent, env, rpm)
-        print('episode:', i,'episode_steps:', episode_steps, '    episode_reward:',  episode_reward)
+    for i in range(50000):
+        episode_reward, episode_steps, critic_loss, actor_loss = run_train_episode(agent, env, rpm)
+        if rpm.size() >= WARMUP_STEPS:
+
+            num.append(i)
+            rewards.append(episode_reward)
+            critic_loss_s.append(critic_loss.numpy())
+            actor_loss_s.append(actor_loss.numpy())
+            plt.figure(figsize=(3, 6), dpi=100)
+            plt.subplot(3, 1, 1)
+            c_loss_line = plt.plot(num, critic_loss_s, 'r', lw=1)
+            plt.subplot(3, 1, 2)
+            a_loss_line = plt.plot(num, actor_loss_s, 'b', lw=1)
+            plt.subplot(3, 1, 3)
+            rewards_line = plt.plot(num, rewards, 'g', lw=1)
+            plt.pause(0.1)
+            plt.close('all')
+            # plt.show()
+            # plt.close()
+            # plt.pause(0.1)
+
+
+
+        if episode_reward>max_score:
+            max_score = episode_reward
+        print('episode:', i, 'episode_steps:', episode_steps, '    episode_reward:',  episode_reward, '      best reward:', max_score)
         # print('episode_steps:', episode_steps)
-        if i % 100 ==0 :
+        if i % 100 == 0 :
             episode_max_steps = 288
             scores = []
             score = run_one_episode(env, SEED, 0, episode_max_steps, agent)
             scores.append(score)
             print('score:', score)
-            if score >= max(scores) :
+            if score >= max(scores):
                 paddle.save(agent.model.state_dict(), model_path)
     # print('-------test-------')
     # # episode_max_steps = 288

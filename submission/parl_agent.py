@@ -19,12 +19,12 @@ def wrap_action(adjust_gen_p):
 
 class ParlAgent(parl.Agent):
     
-    def __init__(self, algorithm, act_dim, expl_noise=0.1):
+    def __init__(self, algoritTAUhm, act_dim, expl_noise=0.1):
 
         super(ParlAgent, self).__init__(algorithm)
         self.act_dim = act_dim
         self.expl_noise = expl_noise
-        self.alg.sync_target(decay=0)
+        self.alg.sync_target(decay=(1.0-TAU))
 
     def sample(self, obs_features, obs):
         # obs_features = paddle.to_tensor(obs_features, dtype='float32')
@@ -56,7 +56,7 @@ class ParlAgent(parl.Agent):
         terminal = paddle.to_tensor(terminal, dtype='float32')
         critic_loss, actor_loss = self.alg.learn(obs, action, reward, next_obs,
                                                  terminal)
-        print('c_loss:', critic_loss, 'a_loss:', actor_loss)
+        # print('c_loss: ', critic_loss.numpy(), 'act_loss', actor_loss.numpy())
         return critic_loss, actor_loss
         # act = np.expand_dims(act, axis=-1)
         # reward = np.expand_dims(reward, axis=-1)
@@ -78,8 +78,6 @@ class ParlAgent(parl.Agent):
 
         mapped_action = low_bound + (action - (-1.0)) * (
                 (high_bound - low_bound) / 2.0)
-        print(mapped_action)
-        print(Settings.balanced_id)
         mapped_action[0, Settings.balanced_id] = 0.0
         mapped_action = np.clip(mapped_action, low_bound, high_bound)
 

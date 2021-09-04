@@ -14,15 +14,12 @@ import copy
 from abc import abstractmethod
 
 
-WARMUP_STEPS = 1e4
-EVAL_EPISODES = 5
-MEMORY_SIZE = int(1e6)
-BATCH_SIZE = 100
+
 GAMMA = 0.99
 TAU = 0.005
 ACTOR_LR = 1e-3
 CRITIC_LR = 1e-3
-EXPL_NOISE = 0.1  # Std of Gaussian exploration noise
+EXPL_NOISE = 0.01  # Std of Gaussian exploration noise
 
 class BaseAgent():
     def __init__(self, num_gen):

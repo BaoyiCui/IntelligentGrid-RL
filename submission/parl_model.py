@@ -31,14 +31,16 @@ class Actor(parl.Model):
     def __init__(self, obs_dim, action_dim):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(obs_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        self.l1 = nn.Linear(obs_dim, 512)
+        self.l2 = nn.Linear(512, 256)
+        self.l3 = nn.Linear(256, 128)
+        self.l4 = nn.Linear(128, action_dim)
 
     def forward(self, obs):
         a = F.relu(self.l1(obs))
         a = F.relu(self.l2(a))
-        return paddle.tanh(self.l3(a))
+        a = F.relu(self.l3(a))
+        return paddle.tanh(self.l4(a))
         # return self.l3(a)
 
 
@@ -46,11 +48,15 @@ class Critic(parl.Model):
     def __init__(self, obs_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.l1 = nn.Linear(obs_dim, 400)
-        self.l2 = nn.Linear(400 + action_dim, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(obs_dim, 512)
+        self.l2 = nn.Linear(512, 256)
+        self.l3 = nn.Linear(256+action_dim,128)
+        # self.l2 = nn.Linear(512, 256)
+        self.l4 = nn.Linear(128, 1)
 
     def forward(self, obs, action):
         q = F.relu(self.l1(obs))
-        q = F.relu(self.l2(paddle.concat([q, action], 1)))
-        return self.l3(q)
+        q = F.relu(self.l2(q))
+        q = F.relu(self.l3(paddle.concat([q, action], 1)))
+        #q = F.relu(self.l2(q))
+        return self.l4(q)

@@ -12,3 +12,7 @@ Agent/.idea/
 *.xml
 
 *.iml
+
+*.pantomime
+
+*.log
