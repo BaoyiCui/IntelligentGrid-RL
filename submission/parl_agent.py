@@ -6,8 +6,6 @@ from submission.parl_model import *
 from submission.parl_algorithm import *
 import parl
 from utilize.settings import settings
-
-
 from abc import abstractmethod
 
 def wrap_action(adjust_gen_p):
@@ -19,12 +17,12 @@ def wrap_action(adjust_gen_p):
 
 class ParlAgent(parl.Agent):
     
-    def __init__(self, algoritTAUhm, act_dim, expl_noise=0.1):
+    def __init__(self, algorithm, act_dim, expl_noise=0.1):
 
         super(ParlAgent, self).__init__(algorithm)
         self.act_dim = act_dim
         self.expl_noise = expl_noise
-        self.alg.sync_target(decay=(1.0-TAU))
+        self.alg.sync_target()
 
     def sample(self, obs_features, obs):
         # obs_features = paddle.to_tensor(obs_features, dtype='float32')

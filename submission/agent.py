@@ -15,11 +15,13 @@ from abc import abstractmethod
 
 
 
-GAMMA = 0.99
+GAMMA = 0.90
 TAU = 0.005
 ACTOR_LR = 1e-3
 CRITIC_LR = 1e-3
 EXPL_NOISE = 0.01  # Std of Gaussian exploration noise
+OBS_DIM = 620
+ACT_DIM = 54
 
 class BaseAgent():
     def __init__(self, num_gen):
@@ -39,8 +41,7 @@ def wrap_action(adjust_gen_p):
     }
     return act
 
-OBS_DIM = 620
-ACT_DIM = 54
+
 
 
 class Agent(BaseAgent):
@@ -51,7 +52,7 @@ class Agent(BaseAgent):
         model_path = os.path.join(this_directory_path, "saved_model/model-1")
         # model = GridModel(OBS_DIM, ACT_DIM)
         self.model = ParlModel(OBS_DIM, ACT_DIM)
-        self.alg = parl.algorithms.DDPG(self.model, gamma=GAMMA, tau=TAU, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR)
+        self.alg = DDPG(self.model, gamma=GAMMA, tau=TAU, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR)
         self.agent = ParlAgent(self.alg, ACT_DIM, EXPL_NOISE)
         
         # paddle.save(model.state_dict(), model_path)

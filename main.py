@@ -10,12 +10,13 @@ from utilize.settings import settings
 import paddle
 from parl.utils import ReplayMemory
 import matplotlib
+
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-MEMORY_SIZE = int(1e6)
+MEMORY_SIZE = int(1e7)
 WARMUP_STEPS = 5000
-BATCH_SIZE = 256
+BATCH_SIZE = 512
 ACT_DIM = 54
 OBS_DIM = 620
 
@@ -27,36 +28,37 @@ def run_train_episode(agent, env, rpm):
     episode_reward, episode_steps = 0.0, 0
     reward = 0.0
     episode_max_steps = 288
-    
+    critic_loss, actor_loss = 0.0, 0.0
     while not done:
         episode_steps += 1
         if rpm.size() < WARMUP_STEPS:
             action_temp = np.random.uniform(-1, 1, size=action_dim)
         else:
             action_temp = agent.act(obs, reward, done)
-        action = agent._process_action(obs, action_temp)    
-          
+        action = agent._process_action(obs, action_temp)
+
         next_obs, reward, done, _ = env.step(action)
 
         terminal = float(done) if episode_steps < episode_max_steps else 0
         obs_temp = agent._process_obs(obs)
         next_obs_temp = agent._process_obs(next_obs)
         action_array = []
-        
+
         rpm.append(obs_temp, action_temp, reward, next_obs_temp, terminal)
         obs = next_obs
         episode_reward += reward
-        critic_loss, actor_loss = 0.0, 0.0
-        if rpm.size() >= WARMUP_STEPS:
+
+        if rpm.size() >= WARMUP_STEPS and (rpm.size() % 10) == 0:
             batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal = rpm.sample_batch(BATCH_SIZE)
 
-            critic_loss, actor_loss = agent.agent.learn(batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal)
-        else:
+            critic_loss, actor_loss = agent.agent.learn(batch_obs, batch_action, batch_reward, batch_next_obs,
+                                                        batch_terminal)
+            critic_loss = critic_loss.numpy()
+            actor_loss = actor_loss.numpy()
+        elif rpm.size() < WARMUP_STEPS:
             print("rpm_size:", rpm.size())
 
-            
     return episode_reward, episode_steps, critic_loss, actor_loss
-    
 
 
 def run_one_episode(env, seed, start_idx, episode_max_steps, agent):
@@ -89,23 +91,21 @@ if __name__ == "__main__":
     env = Environment(settings, 'EPRIReward')
     rpm = ReplayMemory(max_size=MEMORY_SIZE, obs_dim=OBS_DIM, act_dim=ACT_DIM)
     max_score = 0.0
-    max_reward = 0.0
+    # max_reward = 0.0
 
     num = []
     rewards = []
     critic_loss_s = []
     actor_loss_s = []
-
-
     print('-------train-------')
+
     for i in range(50000):
         episode_reward, episode_steps, critic_loss, actor_loss = run_train_episode(agent, env, rpm)
-        if rpm.size() >= WARMUP_STEPS:
-
+        if rpm.size() >= WARMUP_STEPS and (rpm.size() % 5) == 0:
             num.append(i)
             rewards.append(episode_reward)
-            critic_loss_s.append(critic_loss.numpy())
-            actor_loss_s.append(actor_loss.numpy())
+            critic_loss_s.append(critic_loss)
+            actor_loss_s.append(actor_loss)
             plt.figure(figsize=(3, 6), dpi=100)
             plt.subplot(3, 1, 1)
             c_loss_line = plt.plot(num, critic_loss_s, 'r', lw=1)
@@ -118,14 +118,11 @@ if __name__ == "__main__":
             # plt.show()
             # plt.close()
             # plt.pause(0.1)
-
-
-
-        if episode_reward>max_score:
-            max_score = episode_reward
-        print('episode:', i, 'episode_steps:', episode_steps, '    episode_reward:',  episode_reward, '      best reward:', max_score)
+        # if episode_reward>max_score:
+        #     max_score = episode_reward
+        print('episode:', i, 'episode_steps:', episode_steps, '    episode_reward:',  episode_reward)
         # print('episode_steps:', episode_steps)
-        if i % 100 == 0 :
+        if i % 100 == 0:
             episode_max_steps = 288
             scores = []
             score = run_one_episode(env, SEED, 0, episode_max_steps, agent)
