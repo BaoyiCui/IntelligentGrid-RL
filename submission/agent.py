@@ -15,7 +15,7 @@ from abc import abstractmethod
 
 
 
-GAMMA = 0.90
+GAMMA = 0.80
 TAU = 0.005
 ACTOR_LR = 1e-3
 CRITIC_LR = 1e-3

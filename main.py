@@ -14,9 +14,9 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-MEMORY_SIZE = int(1e7)
-WARMUP_STEPS = 5000
-BATCH_SIZE = 512
+MEMORY_SIZE = int(1e6)
+WARMUP_STEPS = 10000
+BATCH_SIZE = 256
 ACT_DIM = 54
 OBS_DIM = 620
 

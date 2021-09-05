@@ -25,9 +25,7 @@ class ParlAgent(parl.Agent):
         self.alg.sync_target()
 
     def sample(self, obs_features, obs):
-        # obs_features = paddle.to_tensor(obs_features, dtype='float32')
         prob = self.predict(obs_features)
-        # prob = prob.numpy()
         action_noise = np.random.normal(0, self.expl_noise, size=self.act_dim)
         act = (prob + action_noise).clip(-1, 1)
         #act = self._process_action(obs, act)
@@ -37,8 +35,6 @@ class ParlAgent(parl.Agent):
 
         obs = paddle.to_tensor(obs.reshape(1, -1), dtype='float32')
         action_numpy = self.alg.predict(obs)
-        # prob = self.alg.predict(obs)
-        # act = self._process_action()
         re_act = action_numpy.argmax().numpy()[0]
 
         return re_act
@@ -54,17 +50,7 @@ class ParlAgent(parl.Agent):
         terminal = paddle.to_tensor(terminal, dtype='float32')
         critic_loss, actor_loss = self.alg.learn(obs, action, reward, next_obs,
                                                  terminal)
-        # print('c_loss: ', critic_loss.numpy(), 'act_loss', actor_loss.numpy())
         return critic_loss, actor_loss
-        # act = np.expand_dims(act, axis=-1)
-        # reward = np.expand_dims(reward, axis=-1)
-        # obs = paddle.to_tensor(obs, dtype='float32')
-        # act = paddle.to_tensor(act, dtype='int32')
-        # reward = paddle.to_tensor(reward, dtype='float32')
-        #
-        # loss = self.alg.learn(obs, act, reward)
-
-        # return loss.numpy()[0]
 
     def _process_action(self, obs, action):
         N = len(action)
