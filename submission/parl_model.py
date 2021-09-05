@@ -8,55 +8,47 @@ import paddle.nn.functional as F
 class ParlModel(parl.Model):
     def __init__(self, obs_dim, act_dim):
         super(ParlModel, self).__init__()
-        self.actor_model = Actor(obs_dim, act_dim)
-        self.critic_model = Critic(obs_dim, act_dim)
-
-    def get_actor_params(self):
-        return self.actor_model.parameters()
+        self.actor = Actor(obs_dim, act_dim)
+        self.critic = Critic(obs_dim)
 
     def policy(self, obs):
-        return self.actor_model(obs)
-
-    def value(self, obs, action):
-        return self.critic_model(obs, action)
-
-    def get_actor_params(self):
-        return self.actor_model.parameters()
-
-    def get_critic_params(self):
-        return self.critic_model.parameters()
+    	return self.actor(obs)
+    	
+    def value(self, obs):
+    	return self.critic(obs)
 
 
 class Actor(parl.Model):
-    def __init__(self, obs_dim, action_dim):
+    def __init__(self, obs_dim, act_dim):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(obs_dim, 512)
-        self.l2 = nn.Linear(512, 256)
-        self.l3 = nn.Linear(256, 128)
-        self.l4 = nn.Linear(128, action_dim)
+        self.fc1 = nn.Linear(obs_dim, 64)
+        self.fc2 = nn.Linear(64, 64)
+
+        self.fc_mean = nn.Linear(64, act_dim)
+        self.log_std = paddle.static.create_parameter(
+            [act_dim],
+            dtype='float32',
+            default_initializer=nn.initializer.Constant(value=0))
 
     def forward(self, obs):
-        a = F.relu(self.l1(obs))
-        a = F.relu(self.l2(a))
-        a = F.relu(self.l3(a))
-        return paddle.tanh(self.l4(a))
-        # return self.l3(a)
+        x = paddle.tanh(self.fc1(obs))
+        x = paddle.tanh(self.fc2(x))
+
+        mean = self.fc_mean(x)
+        return mean, self.log_std
 
 
 class Critic(parl.Model):
-    def __init__(self, obs_dim, action_dim):
+    def __init__(self, obs_dim):
         super(Critic, self).__init__()
+        self.fc1 = nn.Linear(obs_dim, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 1)
 
-        self.l1 = nn.Linear(obs_dim, 512)
-        self.l2 = nn.Linear(512, 256)
-        self.l3 = nn.Linear(256+action_dim,128)
-        # self.l2 = nn.Linear(512, 256)
-        self.l4 = nn.Linear(128, 1)
+    def forward(self, obs):
+        x = paddle.tanh(self.fc1(obs))
+        x = paddle.tanh(self.fc2(x))
+        value = self.fc3(x)
 
-    def forward(self, obs, action):
-        q = F.relu(self.l1(obs))
-        q = F.relu(self.l2(q))
-        q = F.relu(self.l3(paddle.concat([q, action], 1)))
-        #q = F.relu(self.l2(q))
-        return self.l4(q)
+        return value

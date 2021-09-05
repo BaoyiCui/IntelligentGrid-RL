@@ -17,40 +17,86 @@ def wrap_action(adjust_gen_p):
 
 class ParlAgent(parl.Agent):
     
-    def __init__(self, algorithm, act_dim, expl_noise=0.1):
-
+    def __init__(self, algorithm):
         super(ParlAgent, self).__init__(algorithm)
-        self.act_dim = act_dim
-        self.expl_noise = expl_noise
-        self.alg.sync_target()
 
-    def sample(self, obs_features, obs):
-        prob = self.predict(obs_features)
-        action_noise = np.random.normal(0, self.expl_noise, size=self.act_dim)
-        act = (prob + action_noise).clip(-1, 1)
-        #act = self._process_action(obs, act)
-        return act
+    def sample(self, obs):
+        """ Sample action from current policy given observation
+
+        Args:
+            obs (np.array): observation
+        """
+        obs = paddle.to_tensor(obs)
+        value, action, action_log_probs = self.alg.sample(obs)
+
+        return value.detach().numpy(), action.detach().numpy(), \
+            action_log_probs.detach().numpy()
+
 
     def predict(self, obs):
-
-        obs = paddle.to_tensor(obs.reshape(1, -1), dtype='float32')
-        action_numpy = self.alg.predict(obs)
-        re_act = action_numpy.argmax().numpy()[0]
-
-        return re_act
-
-    def learn(self, obs, action, reward, next_obs, terminal):
-        terminal = np.expand_dims(terminal, -1)
-        reward = np.expand_dims(reward, -1)
-
         obs = paddle.to_tensor(obs, dtype='float32')
-        action = paddle.to_tensor(action, dtype='float32')
-        reward = paddle.to_tensor(reward, dtype='float32')
-        next_obs = paddle.to_tensor(next_obs, dtype='float32')
-        terminal = paddle.to_tensor(terminal, dtype='float32')
-        critic_loss, actor_loss = self.alg.learn(obs, action, reward, next_obs,
-                                                 terminal)
-        return critic_loss, actor_loss
+        action = self.alg.predict(obs)
+
+        return action.detach().numpy()
+
+    def learn(self, next_value, gamma, gae_lambda, ppo_epoch, num_mini_batch,
+              rollouts):
+        """ Learn current batch of rollout for ppo_epoch epochs.
+
+        Args:
+            next_value (np.array): next predicted value for calculating advantage
+            gamma (float): the discounting factor
+            gae_lambda (float): lambda for calculating n step return
+            ppo_epoch (int): number of epochs K
+            num_mini_batch (int): number of mini-batches
+            rollouts (RolloutStorage): the rollout storage that contains the current rollout
+        """
+        value_loss_epoch = 0
+        action_loss_epoch = 0
+        dist_entropy_epoch = 0
+
+        for e in range(ppo_epoch):
+            data_generator = rollouts.sample_batch(next_value, gamma,
+                                                   gae_lambda, num_mini_batch)
+
+            for sample in data_generator:
+                obs_batch, actions_batch, \
+                    value_preds_batch, return_batch, old_action_log_probs_batch, \
+                            adv_targ = sample
+
+                obs_batch = paddle.to_tensor(obs_batch)
+                actions_batch = paddle.to_tensor(actions_batch)
+                value_preds_batch = paddle.to_tensor(value_preds_batch)
+                return_batch = paddle.to_tensor(return_batch)
+                old_action_log_probs_batch = paddle.to_tensor(
+                    old_action_log_probs_batch)
+                adv_targ = paddle.to_tensor(adv_targ)
+
+                value_loss, action_loss, dist_entropy = self.alg.learn(
+                    obs_batch, actions_batch, value_preds_batch, return_batch,
+                    old_action_log_probs_batch, adv_targ)
+
+                value_loss_epoch += value_loss
+                action_loss_epoch += action_loss
+                dist_entropy_epoch += dist_entropy
+
+        num_updates = ppo_epoch * num_mini_batch
+
+        value_loss_epoch /= num_updates
+        action_loss_epoch /= num_updates
+        dist_entropy_epoch /= num_updates
+
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+    def value(self, obs):
+        """ Predict value from current value function given observation
+
+        Args:
+            obs (np.array): observation
+        """
+        obs = paddle.to_tensor(obs)
+        val = self.alg.value(obs)
+
+        return val.detach().numpy()
 
     def _process_action(self, obs, action):
         N = len(action)

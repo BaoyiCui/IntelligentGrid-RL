@@ -3,8 +3,8 @@ import paddle
 import numpy as np
 # from submission.grid_model import GridModel
 # from submission.grid_agent import GridAgent
-import parl.algorithms
-
+import  parl.algorithms
+from parl.algorithms import PPO
 from submission.parl_agent import *
 from submission.parl_model import *
 from submission.parl_algorithm import *
@@ -14,14 +14,24 @@ import copy
 from abc import abstractmethod
 
 
-
-GAMMA = 0.80
-TAU = 0.005
-ACTOR_LR = 1e-3
-CRITIC_LR = 1e-3
-EXPL_NOISE = 0.01  # Std of Gaussian exploration noise
 OBS_DIM = 620
 ACT_DIM = 54
+
+LR = 3e-4
+GAMMA = 0.99
+EPS = 1e-5  # Adam optimizer epsilon (default: 1e-5)
+GAE_LAMBDA = 0.95  # Lambda parameter for calculating N-step advantage
+ENTROPY_COEF = 0.  # Entropy coefficient (ie. c_2 in the paper)
+VALUE_LOSS_COEF = 0.5  # Value loss coefficient (ie. c_1 in the paper)
+MAX_GRAD_NROM = 0.5  # Max gradient norm for gradient clipping
+NUM_STEPS = 2048  # data collecting time steps (ie. T in the paper)
+PPO_EPOCH = 10  # number of epochs for updating using each T data (ie K in the paper)
+CLIP_PARAM = 0.2  # epsilon in clipping loss (ie. clip(r_t, 1 - epsilon, 1 + epsilon))
+BATCH_SIZE = 32
+
+# Logging Params
+LOG_INTERVAL = 1
+
 
 class BaseAgent():
     def __init__(self, num_gen):
@@ -52,25 +62,12 @@ class Agent(BaseAgent):
         model_path = os.path.join(this_directory_path, "saved_model/model-1")
         # model = GridModel(OBS_DIM, ACT_DIM)
         self.model = ParlModel(OBS_DIM, ACT_DIM)
-        self.alg = DDPG(self.model, gamma=GAMMA, tau=TAU, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR)
-        self.agent = ParlAgent(self.alg, ACT_DIM, EXPL_NOISE)
+        self.alg = PPO(self.model, CLIP_PARAM, VALUE_LOSS_COEF, ENTROPY_COEF, LR, EPS,MAX_GRAD_NROM)
+        self.agent = ParlAgent(self.alg)
         
-        # paddle.save(model.state_dict(), model_path)
-        # param_dict = paddle.load(model_path)
-        # model.set_state_dict(param_dict)
-        # self.model = model
-        # self.agent = GridAgent(model)
-        
-    def act(self, obs, reward, done=False):
-        features = self._process_obs(obs)
-        # action = self.agent.predict(features)
-        # ret_action = self._process_action(obs, action)
-        features = features.reshape(-1)
-        ret_action = self.agent.sample(features, obs)
-        # ret_action = self._process_action(obs, ret_action)
-        # print(type(ret_action))
-        # ret_action = ret_action[0]
-        return ret_action
+    def act(self, rollouts_obs):
+        value, action, action_log_prob = self.agent.sample(rollouts_obs)
+        return value, action, action_log_prob
     
     def _process_obs(self, obs):
         # loads
@@ -102,6 +99,7 @@ class Agent(BaseAgent):
 
         mapped_action = low_bound + (action - (-1.0)) * (
             (high_bound - low_bound) / 2.0)
+        mapped_action = mapped_action.reshape(-1)
         mapped_action[self.settings.balanced_id] = 0.0
         mapped_action = np.clip(mapped_action, low_bound, high_bound)
         
